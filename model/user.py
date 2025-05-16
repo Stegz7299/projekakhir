@@ -25,3 +25,9 @@ class UserInDB(UserBase):
 
 class User(UserBase):
     pass
+
+class FileMetadata(BaseModel):
+    name: str
+    file_hash: str
+    file_original: str
+    url: str
