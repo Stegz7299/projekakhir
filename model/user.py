@@ -22,6 +22,7 @@ class UserCreate(UserBase):
 
 class UserInDB(UserBase):
     hashed_password: str
+    status: str
 
 class User(UserBase):
     pass
@@ -31,3 +32,12 @@ class FileMetadata(BaseModel):
     file_hash: str
     file_original: str
     url: str
+
+class UserUpdate(BaseModel):
+    username: str 
+    new_username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    old_password: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = None

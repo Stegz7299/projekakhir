@@ -6,11 +6,15 @@ from services.auth_service import (
     create_user,
     get_user,
     create_access_token,
-    get_current_active_user
+    get_current_active_user,
+    verify_password,
+    update_user_in_db
 )
 from datetime import timedelta
 from typing import Optional
 from config.env import ACCESS_TOKEN_EXPIRE_MINUTES
+from model.user import UserUpdate
+from utils.security import pwd_context
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
@@ -21,15 +25,23 @@ async def login_for_access_token(login_data: LoginRequest):
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail={"message": "Incorrect username or password"},
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    if user.status.lower() != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"message": "Account is inactive. Please contact the administrator."},
+        )
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username},
         expires_delta=access_token_expires,
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 @router.post("/register", response_model=User)
 async def register_user(
@@ -39,18 +51,117 @@ async def register_user(
     if current_user.role.lower() != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can register new users"
+            detail={"message": "Only admins can register new users"}
         )
 
     existing_user = get_user(user.username)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
+            detail={"message": "Username already registered"}
+        )
+
+    existing_email = get_user(user.email)
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "Email already registered"}
         )
 
     created_user = create_user(user)
     return created_user
+
+
+@router.patch("/update", response_model=User)
+async def update_user(
+    update_data: UserUpdate,
+    current_user: UserInDB = Depends(get_current_active_user)
+):
+    target_user = get_user(update_data.username)
+    if not target_user:
+        raise HTTPException(status_code=404, detail={"message": "User not found"})
+
+    updates = {}
+
+    if current_user.role.lower() == "admin":
+
+        if update_data.new_username and update_data.new_username != target_user.username:
+            if get_user(update_data.new_username):
+                raise HTTPException(
+                    status_code=409,
+                    detail={"message": "Username already exists"}
+                )
+            updates["username"] = update_data.new_username
+
+        if update_data.email and update_data.email != target_user.email:
+            if get_user(update_data.email):
+                raise HTTPException(
+                    status_code=409,
+                    detail={"message": "Email already exists"}
+                )
+            updates["email"] = update_data.email
+
+        if update_data.role:
+            updates["role"] = update_data.role
+        if update_data.password:
+            updates["password"] = pwd_context.hash(update_data.password)
+        if update_data.status:
+            updates["status"] = update_data.status
+
+    elif current_user.username == update_data.username:
+        # User can only update their own password
+        if not update_data.password:
+            raise HTTPException(
+                status_code=403,
+                detail={"message": "You are only allowed to update your own password"}
+            )
+
+        if not update_data.old_password:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "Old password is required to change your password"}
+            )
+
+        if not verify_password(update_data.old_password, target_user.hashed_password):
+            raise HTTPException(
+                status_code=401,
+                detail={"message": "Old password is incorrect"}
+            )
+
+        updates["password"] = pwd_context.hash(update_data.password)
+
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail={"message": "You don't have permission to update this user"}
+        )
+
+    if not updates:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "No valid fields to update"}
+        )
+
+    # Validate updated version before committing
+    temp_data = target_user.dict()
+    temp_data.update(updates)
+
+    try:
+        User(**temp_data)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail={"message": f"Validation failed: {str(e)}"})
+
+    # Safe to commit
+    update_user_in_db(update_data.username, updates)
+
+    updated_username = update_data.new_username or update_data.username
+    updated_user_data = get_user(updated_username)
+
+    if not updated_user_data:
+        raise HTTPException(status_code=404, detail={"message": "You could only update the password"})
+
+    return User(**updated_user_data.dict())
+
 
 @router.get("/users/me/", response_model=User)
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):

@@ -19,7 +19,7 @@ def get_user(username: str) -> Optional[UserInDB]:
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-        "SELECT username, email, role, password as hashed_password FROM users WHERE username = %s",
+        "SELECT username, email, role, status, password as hashed_password FROM users WHERE username = %s",
         (username,)
     )
 
@@ -37,11 +37,11 @@ def create_user(user: UserCreate):
     try:
         hashed_password = pwd_context.hash(user.password)
         cursor.execute(
-            "INSERT INTO users (uuid, username, email, password, role) VALUES (UUID(), %s, %s, %s, %s)",
+            "INSERT INTO users (uuid, username, email, password, role, status) VALUES (UUID(), %s, %s, %s, %s, 'active')",
             (user.username, user.email, hashed_password, user.role)
         )
         conn.commit()
-        return {"username": user.username, "email": user.email, "role": user.role}
+        return {"username": user.username, "email": user.email, "role": user.role, "status": "active"}
     finally:
         cursor.close()
         conn.close()
@@ -78,6 +78,27 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     if user is None:
         raise credentials_exception
     return user
+
+def update_user_in_db(old_username: str, updates: dict):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    set_clauses = []
+    values = []
+
+    for key, value in updates.items():
+        set_clauses.append(f"{key} = %s")
+        values.append(value)
+
+    set_clause = ", ".join(set_clauses)
+    values.append(old_username)
+
+    sql = f"UPDATE users SET {set_clause} WHERE username = %s"
+
+    cursor.execute(sql, tuple(values))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
     return current_user
