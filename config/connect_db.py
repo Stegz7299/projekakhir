@@ -5,6 +5,6 @@ def mydb():
     host="localhost",
     user="root",
     password="",
-    database="testdatabase"
+    database="projek"
     )
     return mydb

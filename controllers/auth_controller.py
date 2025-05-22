@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
-from model.user import LoginRequest, Token, User, UserCreate, UserInDB
+from model.user import LoginRequest, Token, User, UserCreate, UserInDB, UserResponse
 from services.auth_service import (
     authenticate_user,
     create_user,
@@ -8,13 +8,17 @@ from services.auth_service import (
     create_access_token,
     get_current_active_user,
     verify_password,
-    update_user_in_db
+    update_user_in_db,
+    get_all_users,
+    get_user_by_email
 )
 from datetime import timedelta
 from typing import Optional
 from config.env import ACCESS_TOKEN_EXPIRE_MINUTES
 from model.user import UserUpdate
 from utils.security import pwd_context
+from typing import List
+from services.token_blacklist import blacklist_token
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
@@ -29,7 +33,7 @@ async def login_for_access_token(login_data: LoginRequest):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if user.status.lower() != "active":
+    if user.status != 1:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"message": "Account is inactive. Please contact the administrator."},
@@ -61,7 +65,7 @@ async def register_user(
             detail={"message": "Username already registered"}
         )
 
-    existing_email = get_user(user.email)
+    existing_email = get_user_by_email(user.email)
     if existing_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -72,7 +76,7 @@ async def register_user(
     return created_user
 
 
-@router.patch("/update", response_model=User)
+@router.patch("/update", response_model=UserResponse)
 async def update_user(
     update_data: UserUpdate,
     current_user: UserInDB = Depends(get_current_active_user)
@@ -105,7 +109,7 @@ async def update_user(
             updates["role"] = update_data.role
         if update_data.password:
             updates["password"] = pwd_context.hash(update_data.password)
-        if update_data.status:
+        if update_data.status is not None:
             updates["status"] = update_data.status
 
     elif current_user.username == update_data.username:
@@ -160,20 +164,18 @@ async def update_user(
     if not updated_user_data:
         raise HTTPException(status_code=404, detail={"message": "You could only update the password"})
 
-    return User(**updated_user_data.dict())
+    return UserResponse.from_user_in_db(updated_user_data)
 
+@router.post("/logout")
+async def logout(request: Request, token: str = Depends(oauth2_scheme)):
+    blacklist_token(token)
+    return {"message": "Successfully logged out"}
 
-@router.get("/users/me/", response_model=User)
+@router.get("/users/me/", response_model=UserResponse)
 async def read_users_me(current_user: UserInDB = Depends(get_current_active_user)):
-    return User(username=current_user.username, email=current_user.email, role=current_user.role)
+    return UserResponse.from_user_in_db(current_user)
 
-@router.get("/users/me/items")
-async def read_own_items(current_user: UserInDB = Depends(get_current_active_user)):
-    return [{
-        "item_id": 1,
-        "owner": {
-            "username": current_user.username,
-            "email": current_user.email,
-            "role": current_user.role
-        }
-    }]
+@router.get("/users", response_model=list[UserResponse])
+async def list_all_users(current_user: UserInDB = Depends(get_current_active_user)):
+    users_in_db = get_all_users()
+    return [UserResponse.from_user_in_db(user) for user in users_in_db]

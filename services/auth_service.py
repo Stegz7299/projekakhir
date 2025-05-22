@@ -1,12 +1,13 @@
 from config.connect_db import mydb
 from model.user import UserCreate, UserInDB, TokenData
 from utils.security import pwd_context, verify_password
-from jose import JWTError, jwt
+from jose import JWTError, jwt, ExpiredSignatureError
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
 from config.env import SECRET_KEY, ALGORITHM
+from model.user import User
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
@@ -19,10 +20,9 @@ def get_user(username: str) -> Optional[UserInDB]:
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-        "SELECT username, email, role, status, password as hashed_password FROM users WHERE username = %s",
-        (username,)
-    )
-
+            "SELECT username, email, role, status, password as hashed_password FROM user WHERE username = %s",
+            (username,)
+        )
         user_data = cursor.fetchone()
         if user_data:
             return UserInDB(**user_data)
@@ -31,17 +31,34 @@ def get_user(username: str) -> Optional[UserInDB]:
         cursor.close()
         conn.close()
 
+def get_user_by_email(email: str) -> Optional[UserInDB]:
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT username, email, role, status, password as hashed_password FROM user WHERE email = %s",
+            (email,)
+        )
+        user_data = cursor.fetchone()
+        if user_data:
+            return UserInDB(**user_data)
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def create_user(user: UserCreate):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         hashed_password = pwd_context.hash(user.password)
         cursor.execute(
-            "INSERT INTO users (uuid, username, email, password, role, status) VALUES (UUID(), %s, %s, %s, %s, 'active')",
+            "INSERT INTO user (uuid, username, email, password, role, status) VALUES (UUID(), %s, %s, %s, %s, 1)",
             (user.username, user.email, hashed_password, user.role)
         )
         conn.commit()
-        return {"username": user.username, "email": user.email, "role": user.role, "status": "active"}
+        return {"username": user.username, "email": user.email, "role": user.role, "status": 1}
     finally:
         cursor.close()
         conn.close()
@@ -60,24 +77,42 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
+    from services.token_blacklist import is_token_blacklisted
+
+    if is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"message": "Token has been revoked. Please log in again."},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail={"message": "Could not validate credentials"},
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"message": "Token has expired. Please log in again."},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except JWTError:
         raise credentials_exception
-    
+
     user = get_user(username=token_data.username)
     if user is None:
         raise credentials_exception
+
     return user
+
 
 def update_user_in_db(old_username: str, updates: dict):
     conn = get_db_connection()
@@ -93,7 +128,7 @@ def update_user_in_db(old_username: str, updates: dict):
     set_clause = ", ".join(set_clauses)
     values.append(old_username)
 
-    sql = f"UPDATE users SET {set_clause} WHERE username = %s"
+    sql = f"UPDATE user SET {set_clause} WHERE username = %s"
 
     cursor.execute(sql, tuple(values))
     conn.commit()
@@ -102,3 +137,24 @@ def update_user_in_db(old_username: str, updates: dict):
 
 async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
     return current_user
+
+def get_all_users() -> list[User]:
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT username, email, role, status FROM user")
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    users = [
+        User(
+            username=row["username"],
+            email=row["email"],
+            role=row["role"],
+            status=row.get("status", 0)  # ← return as integer
+        )
+        for row in rows
+    ]
+    return users
