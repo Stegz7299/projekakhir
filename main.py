@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from controllers import auth_controller, file_controller
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from controllers import group_controller
 
 app = FastAPI()
 
@@ -21,6 +22,7 @@ app.add_middleware(
 
 app.include_router(auth_controller.router, prefix="/api/v1")
 app.include_router(file_controller.router, prefix="/api/v1/images")
+app.include_router(group_controller.router, prefix="/api/v1/groups")
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

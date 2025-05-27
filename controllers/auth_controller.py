@@ -52,7 +52,7 @@ async def register_user(
     user: UserCreate,
     current_user: UserInDB = Depends(get_current_active_user)
 ):
-    if current_user.role.lower() != "admin":
+    if current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"message": "Only admins can register new users"}
@@ -87,22 +87,16 @@ async def update_user(
 
     updates = {}
 
-    if current_user.role.lower() == "admin":
-
+    # 1. SUPERADMIN – Full access
+    if current_user.role == "superadmin":
         if update_data.new_username and update_data.new_username != target_user.username:
             if get_user(update_data.new_username):
-                raise HTTPException(
-                    status_code=409,
-                    detail={"message": "Username already exists"}
-                )
+                raise HTTPException(status_code=409, detail={"message": "Username already exists"})
             updates["username"] = update_data.new_username
 
         if update_data.email and update_data.email != target_user.email:
             if get_user(update_data.email):
-                raise HTTPException(
-                    status_code=409,
-                    detail={"message": "Email already exists"}
-                )
+                raise HTTPException(status_code=409, detail={"message": "Email already exists"})
             updates["email"] = update_data.email
 
         if update_data.role:
@@ -112,12 +106,39 @@ async def update_user(
         if update_data.status is not None:
             updates["status"] = update_data.status
 
+    # 2. ADMIN – Limited access
+    elif current_user.role == "admin":
+        # Cannot update superadmin accounts
+        if target_user.role == "superadmin":
+            raise HTTPException(status_code=403, detail={"message": "You can't update a superadmin"})
+
+        if update_data.new_username and update_data.new_username != target_user.username:
+            if get_user(update_data.new_username):
+                raise HTTPException(status_code=409, detail={"message": "Username already exists"})
+            updates["username"] = update_data.new_username
+
+        if update_data.email and update_data.email != target_user.email:
+            if get_user(update_data.email):
+                raise HTTPException(status_code=409, detail={"message": "Email already exists"})
+            updates["email"] = update_data.email
+
+        # Cannot assign or elevate to superadmin
+        if update_data.role:
+            if update_data.role == "superadmin":
+                raise HTTPException(status_code=403, detail={"message": "Admins cannot assign 'superadmin' role"})
+            updates["role"] = update_data.role
+
+        if update_data.password:
+            updates["password"] = pwd_context.hash(update_data.password)
+        if update_data.status is not None:
+            updates["status"] = update_data.status
+
+    # 3. REGULAR USER – Only allowed to update own password
     elif current_user.username == update_data.username:
-        # User can only update their own password
         if not update_data.password:
             raise HTTPException(
                 status_code=403,
-                detail={"message": "You are only allowed to update your own password"}
+                detail={"message": "Only password update is allowed for users"}
             )
 
         if not update_data.old_password:
@@ -146,7 +167,7 @@ async def update_user(
             detail={"message": "No valid fields to update"}
         )
 
-    # Validate updated version before committing
+    # Validate merged data before updating
     temp_data = target_user.dict()
     temp_data.update(updates)
 
@@ -155,7 +176,7 @@ async def update_user(
     except Exception as e:
         raise HTTPException(status_code=422, detail={"message": f"Validation failed: {str(e)}"})
 
-    # Safe to commit
+    # Update in database
     update_user_in_db(update_data.username, updates)
 
     updated_username = update_data.new_username or update_data.username
@@ -165,6 +186,7 @@ async def update_user(
         raise HTTPException(status_code=404, detail={"message": "You could only update the password"})
 
     return UserResponse.from_user_in_db(updated_user_data)
+
 
 @router.post("/logout")
 async def logout(request: Request, token: str = Depends(oauth2_scheme)):
