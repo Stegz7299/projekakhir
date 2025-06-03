@@ -21,6 +21,11 @@ def create(group: Group, current_user: UserInDB = Depends(admin_required)):
 
 @router.patch("/{group_uuid}")
 def update(group_uuid: str, group: GroupUpdate, current_user: UserInDB = Depends(admin_required)):
+    if group_service.is_group_in_active_event(group_uuid):
+        raise HTTPException(
+            status_code=400,
+            detail="User Group tidak bisa diubah selama group ini terpakai di event"
+        )
     return group_service.update_group(group_uuid, group)
 
 @router.delete("/{group_uuid}")

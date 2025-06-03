@@ -142,6 +142,13 @@ def insert_users_from_csv(file: UploadFile, group_uuid: str):
 
     
 def assign_user_to_group(group_uuid: str, user_uuid: str):
+    # 🔒 Check if group is in an active or done event
+    if is_group_in_active_event(group_uuid):
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot assign user to a group that is in an ongoing or completed event"
+        )
+
     conn = mydb()
     cursor = conn.cursor()
 
@@ -154,6 +161,7 @@ def assign_user_to_group(group_uuid: str, user_uuid: str):
         raise HTTPException(status_code=404, detail="User not found")
     user_id = user_row[0]
 
+    # 🔍 Get group ID from UUID
     cursor.execute("SELECT id FROM `group` WHERE uuid = %s", (group_uuid,))
     group_row = cursor.fetchone()
     if not group_row:
@@ -162,17 +170,19 @@ def assign_user_to_group(group_uuid: str, user_uuid: str):
         raise HTTPException(status_code=404, detail="Group not found")
     group_id = group_row[0]
 
+    # ❌ Check if already assigned
     cursor.execute("""
         SELECT id FROM relation_group_user 
-        WHERE groupId = %s AND userId = %s
+        WHERE groupid = %s AND userid = %s
     """, (group_id, user_id))
     if cursor.fetchone():
         cursor.close()
         conn.close()
         return {"message": "User already assigned to this group."}
 
+    # ✅ Assign user to group
     cursor.execute("""
-        INSERT INTO relation_group_user (groupId, userId)
+        INSERT INTO relation_group_user (groupid, userid)
         VALUES (%s, %s)
     """, (group_id, user_id))
     conn.commit()
@@ -182,7 +192,33 @@ def assign_user_to_group(group_uuid: str, user_uuid: str):
 
     return {"message": "User assigned to group successfully."}
 
+
+def is_group_in_active_event(group_uuid: str) -> bool:
+    db = mydb()
+    cursor = db.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT e.id FROM event e
+        JOIN relation_group_event rge ON e.id = rge.eventid
+        JOIN `group` g ON rge.groupid = g.id
+        WHERE g.uuid = %s AND e.status IN ('ongoing', 'done')
+    """, (group_uuid,))
+    
+    result = cursor.fetchone()
+    
+    cursor.close()
+    db.close()
+
+    return result is not None
+
 def remove_user_from_group(group_uuid: str, user_uuid: str):
+    # ❌ Block removal if group is in an ongoing or done event
+    if is_group_in_active_event(group_uuid):
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot remove user from group that is in an ongoing or completed event"
+        )
+
     conn = mydb()
     cursor = conn.cursor()
 
@@ -207,7 +243,7 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
     # Check if relation exists
     cursor.execute("""
         SELECT id FROM relation_group_user 
-        WHERE groupId = %s AND userId = %s
+        WHERE groupid = %s AND userid = %s
     """, (group_id, user_id))
     relation_row = cursor.fetchone()
     if not relation_row:
@@ -218,7 +254,7 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
     # Delete the relation
     cursor.execute("""
         DELETE FROM relation_group_user 
-        WHERE groupId = %s AND userId = %s
+        WHERE groupid = %s AND userid = %s
     """, (group_id, user_id))
     conn.commit()
 
@@ -226,4 +262,3 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
     conn.close()
 
     return {"message": "User removed from group successfully."}
-

@@ -20,7 +20,7 @@ def get_user(username: str) -> Optional[UserInDB]:
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT username, email, role, status, password as hashed_password FROM user WHERE username = %s",
+            "SELECT id, username, email, role, status, password as hashed_password FROM user WHERE username = %s",
             (username,)
         )
         user_data = cursor.fetchone()
@@ -36,7 +36,7 @@ def get_user_by_email(email: str) -> Optional[UserInDB]:
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT username, email, role, status, password as hashed_password FROM user WHERE email = %s",
+            "SELECT id, username, email, role, status, password as hashed_password FROM user WHERE email = %s",
             (email,)
         )
         user_data = cursor.fetchone()

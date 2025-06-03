@@ -47,7 +47,7 @@ async def login_for_access_token(login_data: LoginRequest):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.post("/register", response_model=User)
+@router.post("/users", response_model=User)
 async def register_user(
     user: UserCreate,
     current_user: UserInDB = Depends(get_current_active_user)

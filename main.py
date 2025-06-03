@@ -1,9 +1,8 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from controllers import auth_controller, file_controller
+from controllers import auth_controller, file_controller, group_controller, event_controller
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from controllers import group_controller
 
 app = FastAPI()
 
@@ -23,6 +22,7 @@ app.add_middleware(
 app.include_router(auth_controller.router, prefix="/api/v1")
 app.include_router(file_controller.router, prefix="/api/v1/images")
 app.include_router(group_controller.router, prefix="/api/v1/groups")
+app.include_router(event_controller.router, prefix="/api/v1/events")
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
