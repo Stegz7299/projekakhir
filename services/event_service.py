@@ -35,7 +35,8 @@ def get_all_events(current_user: UserInDB):
         """, (current_user.id,))
 
     events = cursor.fetchall()
-    update_list = []
+    update_event_list = []
+    update_survey_list = []
 
     for event in events:
         current_status = event["status"]
@@ -43,31 +44,43 @@ def get_all_events(current_user: UserInDB):
         end = event.get("time_end")
         uuid_ = event["uuid"]
 
-        if current_status == "archived":
-            continue  # Do not change archived events
+        # --- Update event status ---
+        if current_status != "archived":
+            if end and isinstance(end, datetime) and now > end and current_status != "done":
+                event["status"] = "done"
+                update_event_list.append(("done", uuid_))
+            elif start and isinstance(start, datetime) and now > start and current_status not in ["ongoing", "done"]:
+                event["status"] = "ongoing"
+                update_event_list.append(("ongoing", uuid_))
 
-        if (
-            end is not None and isinstance(end, datetime)
-            and now > end and current_status != "done"
-        ):
-            event["status"] = "done"
-            update_list.append(("done", uuid_))
-        elif (
-            start is not None and isinstance(start, datetime)
-            and now > start and current_status not in ["ongoing", "done"]
-        ):
-            event["status"] = "ongoing"
-            update_list.append(("ongoing", uuid_))
+        if end and isinstance(end, datetime) and now > end:
+    
+            cursor.execute("""
+                SELECT s.uuid FROM survey s
+                JOIN relation_event_survey res ON s.id = res.surveyid
+                JOIN event e ON res.eventid = e.id
+                WHERE e.uuid = %s AND s.status = 'ongoing'
+            """, (uuid_,))
+            surveys = cursor.fetchall()
 
-    for status_val, uuid_ in update_list:
+    for survey in surveys:
+        survey_uuid = survey["uuid"]
+        update_survey_list.append(("done", survey_uuid))
+
+    # --- Apply updates ---
+    for status_val, uuid_ in update_event_list:
         cursor.execute("UPDATE event SET status = %s WHERE uuid = %s", (status_val, uuid_))
 
-    if update_list:
+    for status_val, uuid_ in update_survey_list:
+        cursor.execute("UPDATE survey SET status = %s WHERE uuid = %s", (status_val, uuid_))
+
+    if update_event_list or update_survey_list:
         db.commit()
 
     cursor.close()
     db.close()
     return events
+
 
 
 

@@ -20,7 +20,16 @@ def get_user(username: str) -> Optional[UserInDB]:
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT id, username, email, role, status, password as hashed_password FROM user WHERE username = %s",
+            """
+            SELECT 
+            u.id, u.username, u.email, u.role, u.status, 
+            u.password AS hashed_password, 
+            u.uuid, g.uuid AS group_uuid
+            FROM user u
+            LEFT JOIN `group` g ON u.id = g.id
+            WHERE u.username = %s
+
+            """,
             (username,)
         )
         user_data = cursor.fetchone()
@@ -30,6 +39,7 @@ def get_user(username: str) -> Optional[UserInDB]:
     finally:
         cursor.close()
         conn.close()
+
 
 def get_user_by_email(email: str) -> Optional[UserInDB]:
     conn = get_db_connection()

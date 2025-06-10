@@ -25,6 +25,7 @@ class UserInDB(UserBase):
     id:int
     hashed_password: str
     status: int
+    uuid:str
 
 class User(UserBase):
     pass
