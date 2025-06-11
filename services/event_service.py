@@ -30,7 +30,7 @@ def get_all_events(current_user: UserInDB):
         cursor.execute("""
             SELECT DISTINCT e.* FROM event e
             JOIN relation_group_event rge ON e.id = rge.eventid
-            JOIN relation_group_user rgu ON rge.group_id = rgu.groupid
+            JOIN relation_group_user rgu ON rge.groupid = rgu.groupid
             WHERE rgu.userid = %s
         """, (current_user.id,))
 

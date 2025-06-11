@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Depends
 from model.event import Event, EventUpdate, UserInDB, AssignGroupToEventByUUID
 from services import event_service
+from services.auth_service import get_current_active_user
 
 router = APIRouter()
 
 @router.get("/")
-def get_all_events(current_user: UserInDB = Depends(event_service.admin_required)):
+def get_all_events(current_user: UserInDB = Depends(get_current_active_user)):
     return event_service.get_all_events(current_user)
 
 @router.get("/{event_uuid}")
-def get_event_by_uuid(event_uuid: str, current_user: UserInDB = Depends(event_service.admin_required)):
+def get_event_by_uuid(event_uuid: str, current_user: UserInDB = Depends(get_current_active_user)):
     return event_service.get_event_by_uuid(event_uuid, current_user)
 
 @router.post("/")
