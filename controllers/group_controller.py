@@ -23,8 +23,8 @@ def create(group: Group, current_user: UserInDB = Depends(admin_required)):
 def update(group_uuid: str, group: GroupUpdate, current_user: UserInDB = Depends(admin_required)):
     if group_service.is_group_in_active_event(group_uuid):
         raise HTTPException(
-            status_code=400,
-            detail="User Group tidak bisa diubah selama group ini terpakai di event"
+            status_code=403,
+            detail="User Group cant be changed when the group used in event"
         )
     return group_service.update_group(group_uuid, group)
 
@@ -56,3 +56,10 @@ def remove_user_from_group(
 ):
     return group_service.remove_user_from_group(group_uuid, user_uuid)
 
+@router.delete("/{group_uuid}/event/{event_uuid}")
+def unlink_group_from_event(
+    group_uuid: str,
+    event_uuid: str,
+    current_user: UserInDB = Depends(admin_required)
+):
+    return group_service.unlink_group_from_event(group_uuid, event_uuid)

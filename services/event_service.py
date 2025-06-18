@@ -89,11 +89,22 @@ def get_event_by_uuid(event_uuid: str):
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT * FROM event WHERE uuid = %s", (event_uuid,))
     result = cursor.fetchone()
+    if not result:
+        cursor.close()
+        db.close()
+        raise HTTPException(status_code=404, detail="Event not found")
     cursor.close()
     db.close()
     return result
 
 def create_event(event: Event, current_user: UserInDB):
+    if not event.name or not event.name.strip():
+        raise HTTPException(status_code=400, detail="Event name cannot be empty")
+    if not event.description or not event.description.strip():
+        raise HTTPException(status_code=400, detail="Event description cannot be empty")
+    if not event.time_start or not event.time_end:
+        raise HTTPException(status_code=400, detail="Event start and end time are required")
+
     db = mydb()
     cursor = db.cursor()
     new_uuid = str(uuid.uuid4())
@@ -136,6 +147,7 @@ def create_event(event: Event, current_user: UserInDB):
         "description": event.description,
         "status": status
     }
+
 
 def update_event(event_uuid: str, event: EventUpdate):
     db = mydb()

@@ -31,14 +31,34 @@ def get_group_by_uuid(group_uuid: str):
     return result
 
 def create_group(group: Group):
-    db = mydb()
-    cursor = db.cursor()
-    new_uuid = str(uuid.uuid4())
-    cursor.execute("INSERT INTO `group` (uuid, name) VALUES (%s, %s)", (new_uuid, group.name))
-    db.commit()
-    cursor.close()
-    db.close()
-    return {"uuid": new_uuid, "name": group.name}
+    try:
+        if not group.name or group.name.strip() == "":
+            raise ValueError("Group name cannot be empty")
+
+        db = mydb()
+        cursor = db.cursor()
+        new_uuid = str(uuid.uuid4())
+        cursor.execute("INSERT INTO `group` (uuid, name) VALUES (%s, %s)", (new_uuid, group.name))
+        db.commit()
+        cursor.close()
+        db.close()
+        return {
+            "success": True,
+            "message": "Group created successfully",
+            "uuid": new_uuid,
+            "name": group.name
+        }
+    except ValueError as ve:
+        return {
+            "success": False,
+            "message": str(ve),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": "Failed to create group due to server error",
+            "errors": str(e)
+        }
 
 def update_group(group_uuid: str, group: GroupUpdate):
     db = mydb()
@@ -262,3 +282,44 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
     conn.close()
 
     return {"message": "User removed from group successfully."}
+
+def unlink_group_from_event(group_uuid: str, event_uuid: str):
+    db = mydb()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM `group` WHERE uuid = %s", (group_uuid,))
+    group_row = cursor.fetchone()
+    if not group_row:
+        cursor.close()
+        db.close()
+        raise HTTPException(status_code=404, detail="Group not found")
+    group_id = group_row[0]
+
+    cursor.execute("SELECT id FROM event WHERE uuid = %s", (event_uuid,))
+    event_row = cursor.fetchone()
+    if not event_row:
+        cursor.close()
+        db.close()
+        raise HTTPException(status_code=404, detail="Event not found")
+    event_id = event_row[0]
+
+    cursor.execute("""
+        SELECT id FROM relation_group_event 
+        WHERE groupid = %s AND eventid = %s
+    """, (group_id, event_id))
+    relation_row = cursor.fetchone()
+    if not relation_row:
+        cursor.close()
+        db.close()
+        raise HTTPException(status_code=404, detail="Relation not found")
+
+    cursor.execute("""
+        DELETE FROM relation_group_event 
+        WHERE groupid = %s AND eventid = %s
+    """, (group_id, event_id))
+    db.commit()
+
+    cursor.close()
+    db.close()
+
+    return {"message": "Group unlinked from event successfully."}

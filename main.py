@@ -7,14 +7,17 @@ from fastapi.responses import JSONResponse
 app = FastAPI()
 
 origins = [
-    "http://localhost:3000",  
-    "https://your-frontend-domain.com",  
+    'http://localhost:3000',  
+    'https://your-frontend-domain.com',
+    'http://100.90.147.122:8000',  
+    'http://100.90.147.122'
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,          
     allow_credentials=True,
+    allow_origin_regex=r"http://100\.90\.147\.122:\d+",
     allow_methods=["*"],
     allow_headers=["*"],
 )

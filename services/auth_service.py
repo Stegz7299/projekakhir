@@ -40,6 +40,30 @@ def get_user(username: str) -> Optional[UserInDB]:
         cursor.close()
         conn.close()
 
+def get_user_by_uuid(uuid: str) -> Optional[UserInDB]:
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT 
+                u.id, u.username, u.email, u.role, u.status, 
+                u.password AS hashed_password, u.uuid,
+                g.id AS id, g.name AS name
+            FROM user u
+            LEFT JOIN relation_group_user rgu ON u.id = rgu.userid
+            LEFT JOIN `group` g ON rgu.groupid = g.id
+            WHERE u.uuid = %s
+            """,
+            (uuid,)
+        )
+        user_data = cursor.fetchone()
+        if user_data:
+            return user_data  # Return full dictionary for custom response
+        return None
+    finally:
+        cursor.close()
+        conn.close()
 
 def get_user_by_email(email: str) -> Optional[UserInDB]:
     conn = get_db_connection()
@@ -123,8 +147,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     return user
 
-
-def update_user_in_db(old_username: str, updates: dict):
+def update_user_in_db(uuid: str, updates: dict):
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -136,15 +159,26 @@ def update_user_in_db(old_username: str, updates: dict):
         values.append(value)
 
     set_clause = ", ".join(set_clauses)
-    values.append(old_username)
+    values.append(uuid)
 
-    sql = f"UPDATE user SET {set_clause} WHERE username = %s"
+    sql = f"UPDATE user SET {set_clause} WHERE uuid = %s"
 
     cursor.execute(sql, tuple(values))
     conn.commit()
     cursor.close()
     conn.close()
 
+def set_user_status_by_uuid(uuid: str, status: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    sql = "UPDATE user SET status = %s WHERE uuid = %s"
+    cursor.execute(sql, (status, uuid))
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+    
 async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
     return current_user
 

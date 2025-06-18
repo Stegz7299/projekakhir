@@ -1,9 +1,9 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=1, description="Username cannot be empty")
+    password: str = Field(..., min_length=1, description="Password cannot be empty")
 
 class Token(BaseModel):
     access_token: str
@@ -37,7 +37,6 @@ class FileMetadata(BaseModel):
     url: str
 
 class UserUpdate(BaseModel):
-    username: str 
     new_username: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
