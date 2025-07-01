@@ -9,15 +9,16 @@ app = FastAPI()
 origins = [
     'http://localhost:3000',  
     'https://your-frontend-domain.com',
-    'http://100.90.147.122:8000',  
-    'http://100.90.147.122'
+    'http://100.90.147.122:8000',
+    'http://100.100.11.120',  
+    'http://100.90.147.122',
+    'http://10.126.11.212:5173/'
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,          
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_origin_regex=r"http://100\.90\.147\.122:\d+",
     allow_methods=["*"],
     allow_headers=["*"],
 )
