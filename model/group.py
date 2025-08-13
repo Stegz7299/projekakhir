@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 class Group(BaseModel):
-    uuid: str
+    uuid: Optional[str] = None
     name: str
 
 class GroupUpdate(BaseModel):

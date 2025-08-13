@@ -16,11 +16,11 @@ def get_all_surveys(current_user: UserInDB):
 
     if current_user.role in ("admin", "superadmin"):
         cursor.execute("""
-            SELECT s.* FROM survey s
+            SELECT s.name, s.uuid FROM survey s
         """)
     else:
         cursor.execute("""
-            SELECT s.* FROM survey s
+            SELECT s.name FROM survey s
             JOIN relation_event_survey res ON s.id = res.surveyid
             JOIN event e ON res.eventid = e.id
             WHERE e.status = 'ongoing' AND s.status = 'ongoing'
