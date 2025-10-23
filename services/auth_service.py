@@ -24,7 +24,7 @@ def get_user(username: str) -> Optional[UserInDB]:
             SELECT 
             u.id, u.username, u.email, u.role, u.status, 
             u.password AS hashed_password, 
-            u.uuid, g.uuid AS group_uuid
+            u.uuid, g.uuid AS group_uuid, u.created_at, u.updated_at
             FROM user u
             LEFT JOIN `group` g ON u.id = g.id
             WHERE u.username = %s
@@ -49,7 +49,7 @@ def get_user_by_uuid(uuid: str) -> Optional[UserInDB]:
             SELECT 
                 u.id, u.username, u.email, u.role, u.status, 
                 u.password AS hashed_password, u.uuid,
-                g.id AS id, g.name AS name
+                g.id AS id, g.name AS name, u.created_at, u.updated_at
             FROM user u
             LEFT JOIN relation_group_user rgu ON u.id = rgu.userid
             LEFT JOIN `group` g ON rgu.groupid = g.id
@@ -70,7 +70,7 @@ def get_user_by_email(email: str) -> Optional[UserInDB]:
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT id, username, email, role, status, password as hashed_password FROM user WHERE email = %s",
+            "SELECT id, username, email, role, status, password as hashed_password, created_at, updated_at FROM user WHERE email = %s",
             (email,)
         )
         user_data = cursor.fetchone()
@@ -186,7 +186,7 @@ def get_all_users() -> list[User]:
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("SELECT username, email, role, status FROM user")
+    cursor.execute("SELECT username, email, role, status, created_at, updated_at FROM user")
     rows = cursor.fetchall()
 
     cursor.close()

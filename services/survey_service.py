@@ -1,14 +1,10 @@
 from config.connect_db import mydb
 from fastapi import HTTPException
-from model.survey import Survey, GroupSurveyResponse, SurveyUpdate, UserInDB
-from fastapi.responses import FileResponse
+from model.survey import Survey, SurveyUpdate, UserInDB
 import uuid
-from datetime import datetime
 import json
 from model.survey import Survey
 from config.connect_db import mydb
-import os
-import csv
 
 def get_all_surveys(current_user: UserInDB):
     db = mydb()
@@ -68,15 +64,15 @@ def create_survey(survey: Survey):
         raise HTTPException(status_code=400, detail="Invalid JSON format for form")
 
     cursor.execute("""
-        INSERT INTO survey (uuid, name, form, setpoint, status)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO survey (uuid, name, form, status, created_at, updated_at)
+        VALUES (%s, %s, %s, %s, NOW(), NOW())
     """, (
-        survey_uuid,
-        survey.name,
-        form_str,
-        survey.setpoint,
-        survey.status
+    survey_uuid,
+    survey.name,
+    form_str,
+    survey.status
     ))
+
 
     db.commit()
     cursor.close()
@@ -105,32 +101,12 @@ def assign_survey_to_event(event_uuid: str, survey_uuid: str):
     
     survey_id = survey[0]
 
-    # Generate CSV filename
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    csv_filename = f"survey_result_{event_uuid}_{timestamp}.csv"
-    csv_path = os.path.join("csv_exports", csv_filename)
-
-    # Create directory and CSV file
-    os.makedirs("csv_exports", exist_ok=True)
-    with open(csv_path, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(["name"] + [str(i) for i in range(1, 11)])
 
     # Insert into relation_event_survey
     cursor.execute("""
         INSERT INTO relation_event_survey (eventid, surveyid) VALUES (%s, %s)
     """, (event_id, survey_id))
-    eventsurveyid = cursor.lastrowid
-
-    # Insert one row per group into relation_group_eventsurvey
-    cursor.execute("SELECT id FROM `group`")
-    groups = cursor.fetchall()
-    for (group_id,) in groups:
-        cursor.execute("""
-            INSERT INTO relation_group_eventsurvey (groupid, eventsurveyid, file_name)
-            VALUES (%s, %s, %s)
-        """, (group_id, eventsurveyid, csv_filename))
-
+    
     # Update survey status if event is ongoing
     if event_status == "ongoing":
         cursor.execute("""
@@ -141,7 +117,7 @@ def assign_survey_to_event(event_uuid: str, survey_uuid: str):
     cursor.close()
     db.close()
 
-    return {"message": "Survey assigned to event successfully", "csv_file": csv_filename}
+    return {"message": "Survey assigned to event successfully"}
 
 
 
@@ -169,12 +145,11 @@ def update_survey_by_uuid(survey_uuid: str, update_data: SurveyUpdate):
     if update_data.form is not None:
         update_fields.append("form = %s")
         values.append(json.dumps(update_data.form))
-    if update_data.setpoint is not None:
-        update_fields.append("setpoint = %s")
-        values.append(update_data.setpoint)
     if update_data.status is not None:
         update_fields.append("status = %s")
         values.append(update_data.status)
+
+    update_fields.append("updated_at = NOW()")
 
     if not update_fields:
         cursor.close()

@@ -38,7 +38,7 @@ def create_group(group: Group):
         db = mydb()
         cursor = db.cursor()
         new_uuid = str(uuid.uuid4())
-        cursor.execute("INSERT INTO `group` (uuid, name) VALUES (%s, %s)", (new_uuid, group.name))
+        cursor.execute("INSERT INTO `group` (uuid, name, description) VALUES (%s, %s, %s)", (new_uuid, group.name, group.description))
         db.commit()
         cursor.close()
         db.close()
@@ -63,8 +63,10 @@ def create_group(group: Group):
 def update_group(group_uuid: str, group: GroupUpdate):
     db = mydb()
     cursor = db.cursor()
-    if group.name:
-        cursor.execute("UPDATE `group` SET name = %s WHERE uuid = %s", (group.name, group_uuid))
+    cursor.execute(
+        "UPDATE `group` SET name = %s, description = %s WHERE uuid = %s",
+        (group.name, group.description, group_uuid)
+    )
     db.commit()
     cursor.close()
     db.close()

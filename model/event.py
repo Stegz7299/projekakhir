@@ -9,6 +9,8 @@ class Event(BaseModel):
     time_end: datetime
     description: Optional[str]
     status: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class EventUpdate(BaseModel):
     name: Optional[str] = None

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from datetime import datetime
 
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, description="Username cannot be empty")
@@ -17,6 +18,8 @@ class UserBase(BaseModel):
     email: EmailStr
     role: str
     status: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class UserCreate(UserBase):
     password: str
