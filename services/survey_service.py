@@ -3,8 +3,7 @@ from fastapi import HTTPException
 from model.survey import Survey, SurveyUpdate, UserInDB
 import uuid
 import json
-from model.survey import Survey
-from config.connect_db import mydb
+
 
 def get_all_surveys(current_user: UserInDB):
     db = mydb()
@@ -12,11 +11,13 @@ def get_all_surveys(current_user: UserInDB):
 
     if current_user.role in ("admin", "superadmin"):
         cursor.execute("""
-            SELECT s.name, s.uuid FROM survey s
+            SELECT s.uuid, s.name, s.status, s.created_at, s.updated_at 
+            FROM survey s
         """)
     else:
         cursor.execute("""
-            SELECT s.name FROM survey s
+            SELECT s.uuid, s.name, s.status, s.created_at, s.updated_at 
+            FROM survey s
             JOIN relation_event_survey res ON s.id = res.surveyid
             JOIN event e ON res.eventid = e.id
             WHERE e.status = 'ongoing' AND s.status = 'ongoing'
@@ -25,7 +26,16 @@ def get_all_surveys(current_user: UserInDB):
     surveys = cursor.fetchall()
     cursor.close()
     db.close()
-    return surveys
+
+    if not surveys:
+        return {"status": "success", "message": "No surveys found", "data": []}
+
+    return {
+        "status": "success",
+        "message": "Surveys retrieved successfully",
+        "data": surveys
+    }
+
 
 def get_survey_by_uuid(survey_uuid: str, current_user: UserInDB):
     db = mydb()
@@ -49,7 +59,19 @@ def get_survey_by_uuid(survey_uuid: str, current_user: UserInDB):
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found or not accessible")
 
-    return survey
+    # Parse JSON form if exists
+    if survey.get("form"):
+        try:
+            survey["form"] = json.loads(survey["form"])
+        except Exception:
+            survey["form"] = None
+
+    return {
+        "status": "success",
+        "message": "Survey retrieved successfully",
+        "data": survey
+    }
+
 
 def create_survey(survey: Survey):
     db = mydb()
@@ -66,53 +88,62 @@ def create_survey(survey: Survey):
         INSERT INTO survey (uuid, name, form, status, created_at, updated_at)
         VALUES (%s, %s, %s, %s, NOW(), NOW())
     """, (
-    survey_uuid,
-    survey.name,
-    form_str,
-    survey.status
+        survey_uuid,
+        survey.name,
+        form_str,
+        survey.status
     ))
-
 
     db.commit()
     cursor.close()
     db.close()
 
-    return {"uuid": survey_uuid, "message": "Survey created successfully"}
+    return {
+        "status": "success",
+        "message": "Survey created successfully",
+        "data": {
+            "uuid": survey_uuid,
+            "name": survey.name,
+            "status": survey.status
+        }
+    }
 
 
 def assign_survey_to_event(event_uuid: str, survey_uuid: str):
     db = mydb()
-    cursor = db.cursor()
+    cursor = db.cursor(dictionary=True)
 
     cursor.execute("SELECT id, status FROM event WHERE uuid = %s", (event_uuid,))
     event = cursor.fetchone()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    
-    event_id, event_status = event
 
     cursor.execute("SELECT id FROM survey WHERE uuid = %s", (survey_uuid,))
     survey = cursor.fetchone()
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found")
-    
-    survey_id = survey[0]
 
     cursor.execute("""
         INSERT INTO relation_event_survey (eventid, surveyid) VALUES (%s, %s)
-    """, (event_id, survey_id))
-    
-    if event_status == "ongoing":
+    """, (event["id"], survey["id"]))
+
+    if event["status"] == "ongoing":
         cursor.execute("""
             UPDATE survey SET status = 'ongoing' WHERE id = %s
-        """, (survey_id,))
+        """, (survey["id"],))
 
     db.commit()
     cursor.close()
     db.close()
 
-    return {"message": "Survey assigned to event successfully"}
-
+    return {
+        "status": "success",
+        "message": "Survey assigned to event successfully",
+        "data": {
+            "event_uuid": event_uuid,
+            "survey_uuid": survey_uuid
+        }
+    }
 
 
 def update_survey_by_uuid(survey_uuid: str, update_data: SurveyUpdate):
@@ -156,4 +187,11 @@ def update_survey_by_uuid(survey_uuid: str, update_data: SurveyUpdate):
     cursor.close()
     db.close()
 
-    return {"message": "Survey updated successfully"}
+    return {
+        "status": "success",
+        "message": "Survey updated successfully",
+        "data": {
+            "uuid": survey_uuid,
+            "updated_fields": [f for f in update_data.dict() if update_data.dict()[f] is not None]
+        }
+    }

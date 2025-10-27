@@ -4,6 +4,7 @@ import uuid
 from model.recap import Recap, RecapUpdate
 from datetime import datetime
 
+
 def create_recap(recap: Recap):
     db = mydb()
     cursor = db.cursor()
@@ -18,26 +19,40 @@ def create_recap(recap: Recap):
     cursor.close()
     db.close()
 
-    return {"message": "Recap created successfully", "uuid": recap_uuid}
+    return {
+        "uuid": recap_uuid,
+        "name": recap.name,
+        "message": "Recap created successfully"
+    }
 
 
 def read_all_recaps():
     db = mydb()
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute("SELECT * FROM recap ORDER BY created_at DESC")
-    result = cursor.fetchall()
+    cursor.execute("""
+        SELECT uuid, name, summarize, history_chat, created_at, updated_at
+        FROM recap ORDER BY created_at DESC
+    """)
+    recaps = cursor.fetchall()
 
     cursor.close()
     db.close()
-    return result
+
+    return {
+        "total": len(recaps),
+        "recaps": recaps
+    }
 
 
 def get_recap_by_uuid(recap_uuid: str):
     db = mydb()
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute("SELECT * FROM recap WHERE uuid = %s", (recap_uuid,))
+    cursor.execute("""
+        SELECT uuid, name, summarize, history_chat, created_at, updated_at
+        FROM recap WHERE uuid = %s
+    """, (recap_uuid,))
     recap = cursor.fetchone()
 
     cursor.close()
@@ -46,7 +61,9 @@ def get_recap_by_uuid(recap_uuid: str):
     if not recap:
         raise HTTPException(status_code=404, detail="Recap not found")
 
-    return recap
+    return {
+        "recap": recap
+    }
 
 
 def update_recap(recap_uuid: str, update_data: RecapUpdate):
@@ -74,7 +91,10 @@ def update_recap(recap_uuid: str, update_data: RecapUpdate):
     cursor.close()
     db.close()
 
-    return {"message": "Recap updated successfully"}
+    return {
+        "uuid": recap_uuid,
+        "message": "Recap updated successfully"
+    }
 
 
 def delete_recap(recap_uuid: str):
@@ -87,4 +107,7 @@ def delete_recap(recap_uuid: str):
     cursor.close()
     db.close()
 
-    return {"message": "Recap deleted successfully"}
+    return {
+        "uuid": recap_uuid,
+        "message": "Recap deleted successfully"
+    }
