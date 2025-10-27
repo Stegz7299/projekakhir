@@ -53,7 +53,6 @@ def get_all_events(current_user: UserInDB):
                 update_event_list.append(("ongoing", uuid_))
 
         if end and isinstance(end, datetime) and now > end:
-    
             cursor.execute("""
                 SELECT s.uuid FROM survey s
                 JOIN relation_event_survey res ON s.id = res.surveyid
@@ -77,23 +76,33 @@ def get_all_events(current_user: UserInDB):
 
     cursor.close()
     db.close()
-    return events
 
-
-
+    return {
+        "success": True,
+        "message": "Events retrieved successfully",
+        "count": len(events),
+        "data": events
+    }
 
 def get_event_by_uuid(event_uuid: str):
     db = mydb()
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT * FROM event WHERE uuid = %s", (event_uuid,))
     result = cursor.fetchone()
+
     if not result:
         cursor.close()
         db.close()
         raise HTTPException(status_code=404, detail="Event not found")
+
     cursor.close()
     db.close()
-    return result
+
+    return {
+        "success": True,
+        "message": "Event retrieved successfully",
+        "data": result
+    }
 
 def create_event(event: Event, current_user: UserInDB):
     if not event.name or not event.name.strip():
