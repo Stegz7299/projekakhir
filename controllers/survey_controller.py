@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from model.survey import Survey, AssignSurveyToEvent, GroupSurveyResponse, SurveyUpdate
+from model.survey import Survey, AssignSurveyToEvent, SurveyUpdate
 from model.event import UserInDB
 from services import survey_service
 from services.event_service import admin_required

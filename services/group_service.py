@@ -76,7 +76,6 @@ def delete_group(group_uuid: str):
     db = mydb()
     cursor = db.cursor()
 
-    # Get group ID by UUID
     cursor.execute("SELECT id FROM `group` WHERE uuid = %s", (group_uuid,))
     group_row = cursor.fetchone()
     if not group_row:
@@ -86,7 +85,6 @@ def delete_group(group_uuid: str):
 
     group_id = group_row[0]
 
-    # Check if users are still assigned to the group
     cursor.execute("SELECT COUNT(*) FROM relation_group_user WHERE groupId = %s", (group_id,))
     user_count = cursor.fetchone()[0]
 
@@ -98,7 +96,6 @@ def delete_group(group_uuid: str):
             detail="Cannot delete group: users are still assigned to it"
         )
 
-    # Safe to delete
     cursor.execute("DELETE FROM `group` WHERE id = %s", (group_id,))
     db.commit()
 
@@ -114,7 +111,6 @@ def insert_users_from_csv(file: UploadFile, group_uuid: str):
         conn = mydb()
         cursor = conn.cursor()
 
-        # 🔍 Resolve group_id from group_uuid
         cursor.execute("SELECT id FROM `group` WHERE uuid = %s", (group_uuid,))
         group_row = cursor.fetchone()
         if not group_row:
@@ -129,11 +125,10 @@ def insert_users_from_csv(file: UploadFile, group_uuid: str):
             username = row["username"]
             raw_password = row["password"]
 
-            # Cek apakah user dengan email sudah ada
             cursor.execute("SELECT id FROM user WHERE email = %s", (email,))
             existing_user = cursor.fetchone()
             if existing_user:
-                continue  # skip user yang sudah ada
+                continue 
 
             # Insert user
             user_uuid = str(uuid.uuid4())
@@ -148,7 +143,6 @@ def insert_users_from_csv(file: UploadFile, group_uuid: str):
 
             user_id = cursor.lastrowid
 
-            # Insert into relation_group_user
             cursor.execute("""
                 INSERT INTO relation_group_user (groupId, userId)
                 VALUES (%s, %s)
@@ -164,7 +158,6 @@ def insert_users_from_csv(file: UploadFile, group_uuid: str):
 
     
 def assign_user_to_group(group_uuid: str, user_uuid: str):
-    # 🔒 Check if group is in an active or done event
     if is_group_in_active_event(group_uuid):
         raise HTTPException(
             status_code=403,
@@ -174,7 +167,6 @@ def assign_user_to_group(group_uuid: str, user_uuid: str):
     conn = mydb()
     cursor = conn.cursor()
 
-    # 🔍 Get user ID from UUID
     cursor.execute("SELECT id FROM user WHERE uuid = %s", (user_uuid,))
     user_row = cursor.fetchone()
     if not user_row:
@@ -183,7 +175,6 @@ def assign_user_to_group(group_uuid: str, user_uuid: str):
         raise HTTPException(status_code=404, detail="User not found")
     user_id = user_row[0]
 
-    # 🔍 Get group ID from UUID
     cursor.execute("SELECT id FROM `group` WHERE uuid = %s", (group_uuid,))
     group_row = cursor.fetchone()
     if not group_row:
@@ -192,7 +183,6 @@ def assign_user_to_group(group_uuid: str, user_uuid: str):
         raise HTTPException(status_code=404, detail="Group not found")
     group_id = group_row[0]
 
-    # ❌ Check if already assigned
     cursor.execute("""
         SELECT id FROM relation_group_user 
         WHERE groupid = %s AND userid = %s
@@ -202,7 +192,6 @@ def assign_user_to_group(group_uuid: str, user_uuid: str):
         conn.close()
         return {"message": "User already assigned to this group."}
 
-    # ✅ Assign user to group
     cursor.execute("""
         INSERT INTO relation_group_user (groupid, userid)
         VALUES (%s, %s)
@@ -234,7 +223,6 @@ def is_group_in_active_event(group_uuid: str) -> bool:
     return result is not None
 
 def remove_user_from_group(group_uuid: str, user_uuid: str):
-    # ❌ Block removal if group is in an ongoing or done event
     if is_group_in_active_event(group_uuid):
         raise HTTPException(
             status_code=403,
@@ -244,7 +232,6 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
     conn = mydb()
     cursor = conn.cursor()
 
-    # Get group ID from UUID
     cursor.execute("SELECT id FROM `group` WHERE uuid = %s", (group_uuid,))
     group_row = cursor.fetchone()
     if not group_row:
@@ -253,7 +240,6 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
         raise HTTPException(status_code=404, detail="Group not found")
     group_id = group_row[0]
 
-    # Get user ID from UUID
     cursor.execute("SELECT id FROM user WHERE uuid = %s", (user_uuid,))
     user_row = cursor.fetchone()
     if not user_row:
@@ -262,7 +248,6 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
         raise HTTPException(status_code=404, detail="User not found")
     user_id = user_row[0]
 
-    # Check if relation exists
     cursor.execute("""
         SELECT id FROM relation_group_user 
         WHERE groupid = %s AND userid = %s
@@ -273,7 +258,6 @@ def remove_user_from_group(group_uuid: str, user_uuid: str):
         conn.close()
         raise HTTPException(status_code=404, detail="User is not assigned to this group")
 
-    # Delete the relation
     cursor.execute("""
         DELETE FROM relation_group_user 
         WHERE groupid = %s AND userid = %s

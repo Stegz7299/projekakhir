@@ -56,7 +56,6 @@ def create_survey(survey: Survey):
     cursor = db.cursor()
     survey_uuid = str(uuid.uuid4())
 
-    # Parse form string to JSON to validate it
     try:
         form_obj = json.loads(survey.form) if survey.form else None
         form_str = json.dumps(form_obj) if form_obj else None
@@ -85,7 +84,6 @@ def assign_survey_to_event(event_uuid: str, survey_uuid: str):
     db = mydb()
     cursor = db.cursor()
 
-    # Get event ID and status
     cursor.execute("SELECT id, status FROM event WHERE uuid = %s", (event_uuid,))
     event = cursor.fetchone()
     if not event:
@@ -93,7 +91,6 @@ def assign_survey_to_event(event_uuid: str, survey_uuid: str):
     
     event_id, event_status = event
 
-    # Get survey ID
     cursor.execute("SELECT id FROM survey WHERE uuid = %s", (survey_uuid,))
     survey = cursor.fetchone()
     if not survey:
@@ -101,13 +98,10 @@ def assign_survey_to_event(event_uuid: str, survey_uuid: str):
     
     survey_id = survey[0]
 
-
-    # Insert into relation_event_survey
     cursor.execute("""
         INSERT INTO relation_event_survey (eventid, surveyid) VALUES (%s, %s)
     """, (event_id, survey_id))
     
-    # Update survey status if event is ongoing
     if event_status == "ongoing":
         cursor.execute("""
             UPDATE survey SET status = 'ongoing' WHERE id = %s
@@ -125,7 +119,6 @@ def update_survey_by_uuid(survey_uuid: str, update_data: SurveyUpdate):
     db = mydb()
     cursor = db.cursor()
 
-    # Get the survey ID from UUID
     cursor.execute("SELECT id FROM survey WHERE uuid = %s", (survey_uuid,))
     row = cursor.fetchone()
     if not row:
@@ -135,7 +128,6 @@ def update_survey_by_uuid(survey_uuid: str, update_data: SurveyUpdate):
 
     survey_id = row[0]
 
-    # Build update query dynamically
     update_fields = []
     values = []
 

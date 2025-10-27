@@ -44,7 +44,6 @@ def get_all_events(current_user: UserInDB):
         end = event.get("time_end")
         uuid_ = event["uuid"]
 
-        # --- Update event status ---
         if current_status != "archived":
             if end and isinstance(end, datetime) and now > end and current_status != "done":
                 event["status"] = "done"
@@ -67,7 +66,6 @@ def get_all_events(current_user: UserInDB):
         survey_uuid = survey["uuid"]
         update_survey_list.append(("done", survey_uuid))
 
-    # --- Apply updates ---
     for status_val, uuid_ in update_event_list:
         cursor.execute("UPDATE event SET status = %s WHERE uuid = %s", (status_val, uuid_))
 
@@ -110,7 +108,6 @@ def create_event(event: Event, current_user: UserInDB):
     new_uuid = str(uuid.uuid4())
     status = "archived"
 
-    # Insert into event table
     cursor.execute(
         """
         INSERT INTO event (uuid, name, time_start, time_end, description, status)
@@ -119,7 +116,6 @@ def create_event(event: Event, current_user: UserInDB):
         (new_uuid, event.name, event.time_start, event.time_end, event.description, status)
     )
 
-    # Get the inserted event ID
     cursor.execute("SELECT id FROM event WHERE uuid = %s", (new_uuid,))
     event_row = cursor.fetchone()
     if not event_row:
@@ -129,7 +125,6 @@ def create_event(event: Event, current_user: UserInDB):
 
     event_id = event_row[0]
 
-    # Insert into relation_user_event
     cursor.execute(
         "INSERT INTO relation_user_event (userid, eventid) VALUES (%s, %s)",
         (current_user.id, event_id)
@@ -208,7 +203,6 @@ def publish_event(event_uuid: str, current_user: UserInDB):
     db = mydb()
     cursor = db.cursor(dictionary=True)
 
-    # Check if the event exists and its current status
     cursor.execute("SELECT status FROM event WHERE uuid = %s", (event_uuid,))
     event = cursor.fetchone()
 
@@ -252,7 +246,6 @@ def assign_group_to_event(event_uuid: str, group_uuid: str):
     db = mydb()
     cursor = db.cursor()
 
-    # Get event ID and status from UUID
     cursor.execute("SELECT id, status FROM event WHERE uuid = %s", (event_uuid,))
     event_row = cursor.fetchone()
     if not event_row:
@@ -262,13 +255,11 @@ def assign_group_to_event(event_uuid: str, group_uuid: str):
     
     event_id, event_status = event_row
 
-    # ❌ Check if event status is 'ongoing' or 'done'
     if event_status in ("ongoing", "done"):
         cursor.close()
         db.close()
         raise HTTPException(status_code=403, detail="Cannot assign group to an ongoing or completed event")
 
-    # ✅ Get group_id from group_uuid
     cursor.execute("SELECT id FROM `group` WHERE uuid = %s", (group_uuid,))
     group_row = cursor.fetchone()
     if not group_row:
@@ -278,7 +269,6 @@ def assign_group_to_event(event_uuid: str, group_uuid: str):
 
     group_id = group_row[0]
 
-    # Optional: Check if already assigned
     cursor.execute("""
         SELECT * FROM relation_group_event
         WHERE groupid = %s AND eventid = %s
@@ -288,7 +278,6 @@ def assign_group_to_event(event_uuid: str, group_uuid: str):
         db.close()
         raise HTTPException(status_code=400, detail="Group already assigned to this event")
 
-    # Insert into relation table
     cursor.execute(
         "INSERT INTO relation_group_event (groupid, eventid) VALUES (%s, %s)",
         (group_id, event_id)
