@@ -36,7 +36,7 @@ def create_answer(answer: Answer):
     db.close()
 
     return {
-        "status": "success",
+        "status": True,
         "message": "Answer created successfully",
         "data": {
             "uuid": new_uuid,
@@ -70,7 +70,7 @@ def get_all_answers():
     db.close()
 
     return {
-        "status": "success",
+        "status": True,
         "message": "Answers retrieved successfully",
         "data": results
     }
@@ -103,7 +103,7 @@ def get_answer_by_uuid(answer_uuid: str):
         raise HTTPException(status_code=404, detail="Answer not found")
 
     return {
-        "status": "success",
+        "status": True,
         "message": "Answer retrieved successfully",
         "data": result
     }
@@ -126,7 +126,7 @@ def get_answers_by_event(survey_id: int, current_user):
     db.close()
 
     return {
-        "status": "success",
+        "status": True,
         "message": "Answers retrieved successfully for survey",
         "data": results
     }
@@ -148,7 +148,7 @@ def get_answers_by_event_and_group(survey_id: int, group_id: int, current_user):
     db.close()
 
     return {
-        "status": "success",
+        "status": True,
         "message": "Answers retrieved successfully for group",
         "data": results
     }
@@ -174,7 +174,7 @@ def update_answer(answer_uuid: str, update_data: AnswerUpdate):
     db.close()
 
     return {
-        "status": "success",
+        "status": True,
         "message": "Answer updated successfully",
         "data": {"uuid": answer_uuid}
     }
@@ -202,7 +202,7 @@ def delete_answer(answer_uuid: str):
     db.close()
 
     return {
-        "status": "success",
+        "status": True,
         "message": "Answer deleted successfully",
         "data": {"uuid": answer_uuid}
     }

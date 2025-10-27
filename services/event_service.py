@@ -225,7 +225,6 @@ def publish_event(event_uuid: str, current_user: UserInDB):
         db.close()
         raise HTTPException(status_code=400, detail="Only archived events can be published")
 
-    # Update status to published
     cursor.execute("UPDATE event SET status = %s WHERE uuid = %s", ("published", event_uuid))
     db.commit()
     cursor.close()

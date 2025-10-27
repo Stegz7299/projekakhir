@@ -3,7 +3,7 @@ from config.connect_db import mydb
 import uuid
 from model.recap import Recap, RecapUpdate
 from datetime import datetime
-
+from utils.response import success_response
 
 def create_recap(recap: Recap):
     db = mydb()
@@ -19,11 +19,10 @@ def create_recap(recap: Recap):
     cursor.close()
     db.close()
 
-    return {
-        "uuid": recap_uuid,
-        "name": recap.name,
-        "message": "Recap created successfully"
-    }
+    return success_response(
+            "Recap created successfully",
+            {"uuid": recap_uuid, "name": recap.name}
+        )
 
 
 def read_all_recaps():
@@ -40,6 +39,7 @@ def read_all_recaps():
     db.close()
 
     return {
+        "status": True,
         "total": len(recaps),
         "recaps": recaps
     }
@@ -62,6 +62,7 @@ def get_recap_by_uuid(recap_uuid: str):
         raise HTTPException(status_code=404, detail="Recap not found")
 
     return {
+        "status": True,
         "recap": recap
     }
 
@@ -92,6 +93,7 @@ def update_recap(recap_uuid: str, update_data: RecapUpdate):
     db.close()
 
     return {
+        "status": True,
         "uuid": recap_uuid,
         "message": "Recap updated successfully"
     }
@@ -108,6 +110,7 @@ def delete_recap(recap_uuid: str):
     db.close()
 
     return {
+        "status": True,
         "uuid": recap_uuid,
         "message": "Recap deleted successfully"
     }
