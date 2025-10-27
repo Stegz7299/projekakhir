@@ -17,12 +17,32 @@ def get_all_events(current_user: UserInDB):
     now = datetime.now()
 
     if current_user.role == "superadmin":
-        cursor.execute("SELECT * FROM event")
+        cursor.execute("""SELECT 
+                e.*, 
+                s.id AS survey_id,
+                s.uuid AS survey_uuid,
+                s.name AS survey_title,
+                s.status AS survey_status,
+                s.created_at AS survey_created_at,
+                s.updated_at AS survey_updated_at
+            FROM event e
+            LEFT JOIN relation_event_survey es ON e.id = es.eventid
+            LEFT JOIN survey s ON es.surveyid = s.id""")
 
     elif current_user.role == "admin":
         cursor.execute("""
-            SELECT e.* FROM event e
+            SELECT 
+                e.*, 
+                s.id AS survey_id,
+                s.uuid AS survey_uuid,
+                s.name AS survey_title,
+                s.status AS survey_status,
+                s.created_at AS survey_created_at,
+                s.updated_at AS survey_updated_at
+            FROM event e
             JOIN relation_user_event rue ON e.id = rue.eventid
+            LEFT JOIN relation_event_survey es ON e.id = es.eventid
+            LEFT JOIN survey s ON es.surveyid = s.id
             WHERE rue.userid = %s
         """, (current_user.id,))
 
@@ -37,6 +57,7 @@ def get_all_events(current_user: UserInDB):
     events = cursor.fetchall()
     update_event_list = []
     update_survey_list = []
+    formatted_events = []
 
     for event in events:
         current_status = event["status"]
@@ -61,6 +82,26 @@ def get_all_events(current_user: UserInDB):
             """, (uuid_,))
             surveys = cursor.fetchall()
 
+    survey_obj = None
+    if event.get("survey_id"):
+        survey_obj = {
+        "id": event["survey_id"],
+        "uuid": event["survey_uuid"],
+        "name": event["survey_title"],
+        "status": event["survey_status"],
+        "created_at": event["survey_created_at"],
+        "updated_at": event["survey_updated_at"]
+        }
+    
+    for key in list(event.keys()):
+            if key.startswith("survey_"):
+                event.pop(key)
+    
+    formatted_events.append({
+            **event,
+            "survey": survey_obj
+        })
+
     for survey in surveys:
         survey_uuid = survey["uuid"]
         update_survey_list.append(("done", survey_uuid))
@@ -80,8 +121,8 @@ def get_all_events(current_user: UserInDB):
     return {
         "success": True,
         "message": "Events retrieved successfully",
-        "count": len(events),
-        "data": events
+        "count": len(formatted_events),
+        "data": formatted_events
     }
 
 def get_event_by_uuid(event_uuid: str):

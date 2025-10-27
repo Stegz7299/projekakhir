@@ -40,7 +40,7 @@ def read_all_recaps():
 
     return {
         "status": True,
-        "total": len(recaps),
+        "message": "Recap read succesfully",
         "recaps": recaps
     }
 
