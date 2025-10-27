@@ -191,12 +191,10 @@ def delete_answer(answer_uuid: str):
 
     answer_id = answer[0]
 
-    # Delete relations first
     cursor.execute("DELETE FROM relation_answer_user WHERE answerid = %s", (answer_id,))
     cursor.execute("DELETE FROM relation_answer_group WHERE answerid = %s", (answer_id,))
     cursor.execute("DELETE FROM relation_answer_events WHERE answerid = %s", (answer_id,))
 
-    # Delete main record
     cursor.execute("DELETE FROM answers WHERE id = %s", (answer_id,))
     db.commit()
 

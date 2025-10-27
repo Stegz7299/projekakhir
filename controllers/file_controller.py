@@ -60,7 +60,6 @@ async def update_file_metadata(
     cursor = conn.cursor()
 
     try:
-        # Fetch existing record by ID
         cursor.execute("SELECT file_hash, file_original, url FROM images WHERE id = %s", (id,))
         result = cursor.fetchone()
         if not result:
@@ -70,7 +69,6 @@ async def update_file_metadata(
         new_file_name = old_filename
         new_url = old_url
 
-        # If a new file is provided
         if file:
             content = await file.read()
             ext = os.path.splitext(file.filename)[1]
@@ -113,7 +111,6 @@ async def delete_file_by_id(
     cursor = conn.cursor()
 
     try:
-        # Check if the record exists
         cursor.execute("SELECT file_hash, file_original FROM images WHERE id = %s", (id,))
         result = cursor.fetchone()
         if not result:
@@ -123,11 +120,9 @@ async def delete_file_by_id(
         ext = os.path.splitext(original_filename)[1]
         file_path = os.path.join(UPLOAD_DIR, f"{file_hash}{ext}")
 
-        # Delete the file from disk if it exists
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        # Delete the record from the database
         cursor.execute("DELETE FROM images WHERE id = %s", (id,))
         conn.commit()
 
