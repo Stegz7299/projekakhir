@@ -59,13 +59,6 @@ def get_survey_by_uuid(survey_uuid: str, current_user: UserInDB):
     if not survey:
         raise HTTPException(status_code=404, detail="Survey not found or not accessible")
 
-    # Parse JSON form if exists
-    if survey.get("form"):
-        try:
-            survey["form"] = json.loads(survey["form"])
-        except Exception:
-            survey["form"] = None
-
     return {
         "success": True,
         "message": "Survey retrieved successfully",
@@ -78,19 +71,13 @@ def create_survey(survey: Survey):
     cursor = db.cursor()
     survey_uuid = str(uuid.uuid4())
 
-    try:
-        form_obj = json.loads(survey.form) if survey.form else None
-        form_str = json.dumps(form_obj) if form_obj else None
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON format for form")
-
     cursor.execute("""
         INSERT INTO survey (uuid, name, form, status, created_at, updated_at)
         VALUES (%s, %s, %s, %s, NOW(), NOW())
     """, (
         survey_uuid,
         survey.name,
-        form_str,
+        survey.form,
         survey.status
     ))
 
