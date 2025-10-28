@@ -137,7 +137,8 @@ def get_event_by_uuid(event_uuid: str):
                 s.updated_at AS survey_updated_at
             FROM event e
             LEFT JOIN relation_event_survey es ON e.id = es.eventid
-            LEFT JOIN survey s ON es.surveyid = s.id""", (event_uuid,))
+            LEFT JOIN survey s ON es.surveyid = s.id
+            WHERE e.uuid = %s""", (event_uuid,))
     result = cursor.fetchone()
 
     if not result:
