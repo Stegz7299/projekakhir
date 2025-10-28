@@ -11,7 +11,7 @@ def get_all_events(current_user: UserInDB = Depends(get_current_active_user)):
 
 @router.get("/{event_uuid}")
 def get_event_by_uuid(event_uuid: str, current_user: UserInDB = Depends(get_current_active_user)):
-    return event_service.get_event_by_uuid(event_uuid, current_user)
+    return event_service.get_event_by_uuid(event_uuid)
 
 @router.post("/")
 def create_event(event: Event, current_user: UserInDB = Depends(event_service.admin_required)):
