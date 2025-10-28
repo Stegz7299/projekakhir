@@ -13,39 +13,37 @@ def admin_required(current_user: UserInDB = Depends(get_current_active_user)):
 def get_all_events(current_user: UserInDB):
     db = mydb()
     cursor = db.cursor(dictionary=True)
-
     now = datetime.now()
 
     if current_user.role == "superadmin":
-        cursor.execute("""SELECT 
-                e.*, 
-                s.id AS survey_id,
-                s.uuid AS survey_uuid,
-                s.name AS survey_title,
-                s.status AS survey_status,
-                s.created_at AS survey_created_at,
-                s.updated_at AS survey_updated_at
+        cursor.execute("""
+            SELECT e.*, 
+                   s.id AS survey_id,
+                   s.uuid AS survey_uuid,
+                   s.name AS survey_title,
+                   s.status AS survey_status,
+                   s.created_at AS survey_created_at,
+                   s.updated_at AS survey_updated_at
             FROM event e
             LEFT JOIN relation_event_survey es ON e.id = es.eventid
-            LEFT JOIN survey s ON es.surveyid = s.id""")
-
+            LEFT JOIN survey s ON es.surveyid = s.id
+            ORDER BY e.created_at DESC
+        """)
     elif current_user.role == "admin":
         cursor.execute("""
-            SELECT 
-                e.*, 
-                s.id AS survey_id,
-                s.uuid AS survey_uuid,
-                s.name AS survey_title,
-                s.status AS survey_status,
-                s.created_at AS survey_created_at,
-                s.updated_at AS survey_updated_at
+            SELECT e.*, 
+                   s.id AS survey_id,
+                   s.uuid AS survey_uuid,
+                   s.name AS survey_title,
+                   s.status AS survey_status,
+                   s.created_at AS survey_created_at,
+                   s.updated_at AS survey_updated_at
             FROM event e
             JOIN relation_user_event rue ON e.id = rue.eventid
             LEFT JOIN relation_event_survey es ON e.id = es.eventid
             LEFT JOIN survey s ON es.surveyid = s.id
             WHERE rue.userid = %s
         """, (current_user.id,))
-
     else:  # user
         cursor.execute("""
             SELECT DISTINCT e.* FROM event e
@@ -73,6 +71,7 @@ def get_all_events(current_user: UserInDB):
                 event["status"] = "ongoing"
                 update_event_list.append(("ongoing", uuid_))
 
+        surveys = []
         if end and isinstance(end, datetime) and now > end:
             cursor.execute("""
                 SELECT s.uuid FROM survey s
@@ -82,29 +81,28 @@ def get_all_events(current_user: UserInDB):
             """, (uuid_,))
             surveys = cursor.fetchall()
 
-    survey_obj = None
-    if event.get("survey_id"):
-        survey_obj = {
-        "id": event["survey_id"],
-        "uuid": event["survey_uuid"],
-        "name": event["survey_title"],
-        "status": event["survey_status"],
-        "created_at": event["survey_created_at"],
-        "updated_at": event["survey_updated_at"]
-        }
-    
-    for key in list(event.keys()):
+        survey_obj = None
+        if event.get("survey_id"):
+            survey_obj = {
+                "survey_id": event["survey_id"],
+                "survey_uuid": event["survey_uuid"],
+                "name": event["survey_title"],
+                "status": event["survey_status"],
+                "created_at": event["survey_created_at"],
+                "updated_at": event["survey_updated_at"]
+            }
+
+        for key in list(event.keys()):
             if key.startswith("survey_"):
                 event.pop(key)
-    
-    formatted_events.append({
+
+        formatted_events.append({
             **event,
             "survey": survey_obj
         })
 
-    for survey in surveys:
-        survey_uuid = survey["uuid"]
-        update_survey_list.append(("done", survey_uuid))
+        for survey in surveys:
+            update_survey_list.append(("done", survey["uuid"]))
 
     for status_val, uuid_ in update_event_list:
         cursor.execute("UPDATE event SET status = %s WHERE uuid = %s", (status_val, uuid_))
@@ -128,23 +126,56 @@ def get_all_events(current_user: UserInDB):
 def get_event_by_uuid(event_uuid: str):
     db = mydb()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("""SELECT e.*, 
-                s.id AS survey_id,
-                s.uuid AS survey_uuid,
-                s.name AS survey_title,
-                s.status AS survey_status,
-                s.created_at AS survey_created_at,
-                s.updated_at AS survey_updated_at
-            FROM event e
-            LEFT JOIN relation_event_survey es ON e.id = es.eventid
-            LEFT JOIN survey s ON es.surveyid = s.id
-            WHERE e.uuid = %s""", (event_uuid,))
-    result = cursor.fetchone()
+    cursor.execute("""
+        SELECT 
+            e.id AS event_id,
+            e.uuid AS event_uuid,
+            e.name AS event_name,
+            e.description AS event_description,
+            e.time_start AS event_start_date,
+            e.time_end AS event_end_date,
+            e.created_at AS event_created_at,
+            e.updated_at AS event_updated_at,
 
-    if not result:
+            s.id AS survey_id,
+            s.uuid AS survey_uuid,
+            s.name AS survey_name,
+            s.status AS survey_status,
+            s.created_at AS survey_created_at,
+            s.updated_at AS survey_updated_at
+        FROM event e
+        LEFT JOIN relation_event_survey es ON e.id = es.eventid
+        LEFT JOIN survey s ON es.surveyid = s.id
+        WHERE e.uuid = %s
+    """, (event_uuid,))
+
+    row = cursor.fetchone()
+
+    if not row:
         cursor.close()
         db.close()
         raise HTTPException(status_code=404, detail="Event not found")
+
+    result = {
+        "id": row["event_id"],
+        "uuid": row["event_uuid"],
+        "name": row["event_name"],
+        "description": row["event_description"],
+        "start_date": row["event_start_date"],
+        "end_date": row["event_end_date"],
+        "created_at": row["event_created_at"],
+        "updated_at": row["event_updated_at"],
+    }
+
+    if row["survey_id"] is not None:
+        result["survey"] = {
+            "id": row["survey_id"],
+            "uuid": row["survey_uuid"],
+            "name": row["survey_name"],
+            "status": row["survey_status"],
+            "created_at": row["survey_created_at"],
+            "updated_at": row["survey_updated_at"],
+        }
 
     cursor.close()
     db.close()
