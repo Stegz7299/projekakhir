@@ -11,6 +11,7 @@ class Event(BaseModel):
     status: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    survey_id: Optional[int] = None
 
 class EventUpdate(BaseModel):
     name: Optional[str] = None

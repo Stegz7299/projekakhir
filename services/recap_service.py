@@ -39,7 +39,7 @@ def read_all_recaps():
     db.close()
 
     return {
-        "status": True,
+        "success": True,
         "message": "Recap read succesfully",
         "recaps": recaps
     }
@@ -62,8 +62,11 @@ def get_recap_by_uuid(recap_uuid: str):
         raise HTTPException(status_code=404, detail="Recap not found")
 
     return {
-        "status": True,
+        "success": True,
+        "message": "Recap found!",
+        "data":{
         "recap": recap
+        }
     }
 
 

@@ -180,17 +180,27 @@ def create_event(event: Event, current_user: UserInDB):
         (current_user.id, event_id)
     )
 
+    if event.survey_id:
+        cursor.execute(
+            "INSERT INTO relation_event_survey (eventId, surveyId) VALUES (%s, %s)",
+            (event_id, event.survey_id)
+        )
+
     db.commit()
     cursor.close()
     db.close()
 
     return {
+        "success": True,
+        "message": "Event created successfully",
+        "data":{
         "uuid": new_uuid,
         "name": event.name,
         "time_start": event.time_start,
         "time_end": event.time_end,
         "description": event.description,
         "status": status
+        }
     }
 
 
