@@ -28,10 +28,10 @@ def get_all_surveys(current_user: UserInDB):
     db.close()
 
     if not surveys:
-        return {"status": False, "message": "No surveys found", "data": []}
+        return {"success": False, "message": "No surveys found", "data": []}
 
     return {
-        "status": True,
+        "success": True,
         "message": "Surveys retrieved successfully",
         "data": surveys
     }
@@ -67,7 +67,7 @@ def get_survey_by_uuid(survey_uuid: str, current_user: UserInDB):
             survey["form"] = None
 
     return {
-        "status": True,
+        "success": True,
         "message": "Survey retrieved successfully",
         "data": survey
     }
@@ -99,7 +99,7 @@ def create_survey(survey: Survey):
     db.close()
 
     return {
-        "status": True,
+        "success": True,
         "message": "Survey created successfully",
         "data": {
             "uuid": survey_uuid,
@@ -137,7 +137,7 @@ def assign_survey_to_event(event_uuid: str, survey_uuid: str):
     db.close()
 
     return {
-        "status": True,
+        "success": True,
         "message": "Survey assigned to event successfully",
         "data": {
             "event_uuid": event_uuid,
@@ -188,7 +188,7 @@ def update_survey_by_uuid(survey_uuid: str, update_data: SurveyUpdate):
     db.close()
 
     return {
-        "status": True,
+        "success": True,
         "message": "Survey updated successfully",
         "data": {
             "uuid": survey_uuid,
