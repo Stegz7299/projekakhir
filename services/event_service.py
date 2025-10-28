@@ -128,7 +128,16 @@ def get_all_events(current_user: UserInDB):
 def get_event_by_uuid(event_uuid: str):
     db = mydb()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM event WHERE uuid = %s", (event_uuid,))
+    cursor.execute("""SELECT e.*, 
+                s.id AS survey_id,
+                s.uuid AS survey_uuid,
+                s.name AS survey_title,
+                s.status AS survey_status,
+                s.created_at AS survey_created_at,
+                s.updated_at AS survey_updated_at
+            FROM event e
+            LEFT JOIN relation_event_survey es ON e.id = es.eventid
+            LEFT JOIN survey s ON es.surveyid = s.id""", (event_uuid,))
     result = cursor.fetchone()
 
     if not result:
