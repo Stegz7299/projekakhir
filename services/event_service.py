@@ -295,7 +295,16 @@ def update_event(event_uuid: str, event: EventUpdate):
 
     cursor.close()
     db.close()
-    return {"message": "Event updated successfully"}
+    return {
+        "success": True,
+        "message": "Event updated successfully",
+        "data":{
+        "name": event.name,
+        "time_start": event.time_start,
+        "time_end": event.time_end,
+        "description": event.description,
+        }
+    }
 
 def publish_event(event_uuid: str, current_user: UserInDB):
     if current_user.role != "superadmin":
@@ -322,7 +331,9 @@ def publish_event(event_uuid: str, current_user: UserInDB):
     cursor.close()
     db.close()
 
-    return {"message": "Event published successfully"}
+    return {
+        "success": True,
+        "message": "Event published successfully"}
 
 
 def delete_event(event_uuid: str):
@@ -340,7 +351,9 @@ def delete_event(event_uuid: str):
     db.commit()
     cursor.close()
     db.close()
-    return {"message": "Event deleted successfully"}
+    return {
+        "success": True,
+        "message": "Event deleted successfully"}
 
 def assign_group_to_event(event_uuid: str, group_uuid: str):
     db = mydb()
@@ -387,4 +400,5 @@ def assign_group_to_event(event_uuid: str, group_uuid: str):
     cursor.close()
     db.close()
 
-    return {"message": "Group assigned to event successfully"}
+    return {"success": True,
+        "message": "Group assigned to event successfully"}
